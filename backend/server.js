@@ -317,6 +317,44 @@ app.get('/pickup/:id', async (req, res) => {
     res.status(200).json(data);
 });
 
+app.put('/users/:id', async (req, res) => {
+    const { id } = req.params;
+    const {
+        is_verified,
+        points,
+        badges,
+        ngo_reg_id,
+        address,
+        donor_type,
+        role,
+        name,
+        email,
+        phone
+    } = req.body;
+
+    const updateFields = {};
+    if (is_verified !== undefined) updateFields.is_verified = is_verified;
+    if (points !== undefined) updateFields.points = points;
+    if (badges !== undefined) updateFields.badges = badges;
+    if (ngo_reg_id !== undefined) updateFields.ngo_reg_id = ngo_reg_id;
+    if (address !== undefined) updateFields.address = address;
+    if (donor_type !== undefined) updateFields.donor_type = donor_type;
+    if (role !== undefined) updateFields.role = role;
+    if (name !== undefined) updateFields.name = name;
+    if (email !== undefined) updateFields.email = email;
+    if (phone !== undefined) updateFields.phone = phone;
+
+    const { data, error } = await supabase
+        .from('users')
+        .update(updateFields)
+        .eq('id', id)
+        .select('*');
+
+    if (error) return res.status(500).json(error);
+
+    res.status(200).json(data);
+});
+
 app.listen(process.env.PORT, () => {
     console.log(`Server running on port ${process.env.PORT}`);
 });
