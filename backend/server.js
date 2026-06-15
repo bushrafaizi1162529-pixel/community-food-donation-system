@@ -2,11 +2,19 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
+// Fix SSL cert verification for Node.js 24+ in development
+// (Supabase uses certs that Node 24 strict TLS can't verify without system CA)
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 const supabase = require('./supabaseClient');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 app.get('/', (req, res) => {
@@ -85,11 +93,42 @@ app.get('/food/:id', async (req, res) => {
 
 app.put('/food/:id', async (req, res) => {
     const { id } = req.params;
-    const { status } = req.body;
+    // Accept any subset of updatable fields
+    const {
+        status,
+        food_name,
+        quantity,
+        description,
+        expiry_time,
+        location,
+        category,
+        veg_non_veg,
+        pickup_time,
+        contact_number,
+        image_url,
+        assigned_ngo_id,
+        assigned_ngo_name
+    } = req.body;
+
+    // Build update object with only provided fields
+    const updateFields = {};
+    if (status !== undefined)           updateFields.status = status;
+    if (food_name !== undefined)        updateFields.food_name = food_name;
+    if (quantity !== undefined)         updateFields.quantity = quantity;
+    if (description !== undefined)      updateFields.description = description;
+    if (expiry_time !== undefined)      updateFields.expiry_time = expiry_time;
+    if (location !== undefined)         updateFields.location = location;
+    if (category !== undefined)         updateFields.category = category;
+    if (veg_non_veg !== undefined)      updateFields.veg_non_veg = veg_non_veg;
+    if (pickup_time !== undefined)      updateFields.pickup_time = pickup_time;
+    if (contact_number !== undefined)   updateFields.contact_number = contact_number;
+    if (image_url !== undefined)        updateFields.image_url = image_url;
+    if (assigned_ngo_id !== undefined)  updateFields.assigned_ngo_id = assigned_ngo_id;
+    if (assigned_ngo_name !== undefined) updateFields.assigned_ngo_name = assigned_ngo_name;
 
     const { data, error } = await supabase
         .from('food_donations')
-        .update({ status })
+        .update(updateFields)
         .eq('id', id)
         .select('*');
 
@@ -97,6 +136,7 @@ app.put('/food/:id', async (req, res) => {
 
     res.status(200).json(data);
 });
+
 
 app.post('/food', async (req, res) => {
     const {
@@ -107,7 +147,13 @@ app.post('/food', async (req, res) => {
         location,
         latitude,
         longitude,
-        donor_id
+        donor_id,
+        donor_name,
+        category,
+        veg_non_veg,
+        pickup_time,
+        contact_number,
+        image_url
     } = req.body;
 
     const { data, error } = await supabase
@@ -121,6 +167,12 @@ app.post('/food', async (req, res) => {
             latitude,
             longitude,
             donor_id,
+            donor_name,
+            category,
+            veg_non_veg,
+            pickup_time,
+            contact_number,
+            image_url,
             status: 'available'
         }])
         .select('*');
@@ -129,6 +181,7 @@ app.post('/food', async (req, res) => {
 
     res.status(201).json(data);
 });
+
 
 app.delete('/food/:id', async (req, res) => {
     const { id } = req.params;
@@ -246,6 +299,20 @@ app.get('/pickup', async (req, res) => {
     if (error) {
         return res.status(500).json(error);
     }
+
+    res.status(200).json(data);
+});
+
+app.get('/pickup/:id', async (req, res) => {
+    const { id } = req.params;
+
+    const { data, error } = await supabase
+        .from('pickup_requests')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+    if (error) return res.status(500).json(error);
 
     res.status(200).json(data);
 });

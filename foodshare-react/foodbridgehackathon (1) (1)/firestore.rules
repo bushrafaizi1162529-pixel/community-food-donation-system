@@ -1,0 +1,125 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default deny global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Common security helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // UserProfile schema verification
+    function isValidUserProfile(data) {
+      return data.name is string && data.name.size() <= 150
+          && data.email is string && data.email.size() <= 150
+          && data.phone is string && data.phone.size() <= 30
+          && data.address is string && data.address.size() <= 300
+          && data.role is string && (data.role == 'donor' || data.role == 'ngo' || data.role == 'admin')
+          && (!('orgName' in data) || (data.orgName is string && data.orgName.size() <= 200))
+          && (!('regId' in data) || (data.regId is string && data.regId.size() <= 100))
+          && (!('profilePhoto' in data) || (data.profilePhoto is string && data.profilePhoto.size() <= 1000));
+    }
+
+    // DonationItem schema verification
+    function isValidDonation(data) {
+      return data.id is string && data.id.size() <= 100
+          && data.donorId is string && data.donorId.size() <= 128
+          && data.donorName is string && data.donorName.size() <= 150
+          && data.foodName is string && data.foodName.size() <= 200
+          && data.quantity is string && data.quantity.size() <= 100
+          && data.category is string && (data.category == 'Meal' || data.category == 'Grocery' || data.category == 'Raw Veggies' || data.category == 'Bakery' || data.category == 'Beverages' || data.category == 'Packed Food' || data.category == 'Other')
+          && data.vegNonVeg is string && (data.vegNonVeg == 'Veg' || data.vegNonVeg == 'Non-Veg')
+          && data.expiryTime is string && data.expiryTime.size() <= 100
+          && data.pickupTime is string && data.pickupTime.size() <= 100
+          && data.pickupAddress is string && data.pickupAddress.size() <= 300
+          && data.contactNumber is string && data.contactNumber.size() <= 30
+          // Note: imageUrl is sometimes optional or blank, size can be up to 1000
+          && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 1000))
+          && data.status is string && (data.status == 'Available' || data.status == 'Requested' || data.status == 'Accepted' || data.status == 'Picked Up' || data.status == 'Delivered')
+          && data.createdAt is string && data.createdAt.size() <= 100
+          && data.lat is number
+          && data.lng is number
+          && (!('distance' in data) || (data.distance is string && data.distance.size() <= 50))
+          && (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000))
+          && (!('assignedNgoId' in data) || (data.assignedNgoId is string && data.assignedNgoId.size() <= 128))
+          && (!('assignedNgoName' in data) || (data.assignedNgoName is string && data.assignedNgoName.size() <= 150));
+    }
+
+    // Notification schema verification
+    function isValidNotification(data) {
+      return data.id is string && data.id.size() <= 100
+          && data.type is string && (data.type == 'New Donation' || data.type == 'Pickup Request' || data.type == 'Accepted Donation' || data.type == 'Delivered Donation')
+          && data.title is string && data.title.size() <= 200
+          && data.message is string && data.message.size() <= 1000
+          && data.time is string && data.time.size() <= 100
+          && data.read is bool
+          && (!('donationId' in data) || (data.donationId is string && data.donationId.size() <= 100))
+          && (!('userId' in data) || (data.userId is string && data.userId.size() <= 128));
+    }
+
+    // 1. Users collection rules
+    match /users/{userId} {
+      allow read: if isSignedIn(); // Verified members can see NGO/donor names, contacts
+      allow create: if isOwner(userId) && isValidUserProfile(request.resource.data);
+      allow update: if isOwner(userId) && isValidUserProfile(request.resource.data)
+                    && request.resource.data.role == resource.data.role; // Immutable roles to prevent privilege escalation
+      allow delete: if false;
+    }
+
+    // 2. Donations collection rules
+    match /donations/{donationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() 
+                    && isValidId(donationId) 
+                    && request.resource.data.donorId == request.auth.uid // Strict identity binding
+                    && isValidDonation(request.resource.data);
+                    
+      allow update: if isSignedIn()
+                    && isValidId(donationId)
+                    && isValidDonation(request.resource.data)
+                    && (
+                      // TIER 1: Owner changes everything
+                      (resource.data.donorId == request.auth.uid) ||
+                      // TIER 2: NGO captures / accepts donation:
+                      // Ensure they don't spoof the core donation details listed by donor
+                      (
+                        request.resource.data.donorId == resource.data.donorId
+                        && request.resource.data.foodName == resource.data.foodName
+                        && request.resource.data.quantity == resource.data.quantity
+                        && request.resource.data.category == resource.data.category
+                        && request.resource.data.vegNonVeg == resource.data.vegNonVeg
+                        && request.resource.data.expiryTime == resource.data.expiryTime
+                        && request.resource.data.pickupTime == resource.data.pickupTime
+                        && request.resource.data.pickupAddress == resource.data.pickupAddress
+                        && request.resource.data.contactNumber == resource.data.contactNumber
+                        && request.resource.data.createdAt == resource.data.createdAt
+                        && request.resource.data.lat == resource.data.lat
+                        && request.resource.data.lng == resource.data.lng
+                      )
+                    );
+      allow delete: if isSignedIn() && resource.data.donorId == request.auth.uid;
+    }
+
+    // 3. Notifications collection rules
+    match /notifications/{notificationId} {
+      // Recipient partition protection
+      allow read: if isSignedIn() && (!('userId' in resource.data) || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(request.resource.data);
+      allow update: if isSignedIn() && isValidId(notificationId) && isValidNotification(request.resource.data)
+                    && (!('userId' in resource.data) || resource.data.userId == request.auth.uid);
+      allow delete: if isSignedIn() && (!('userId' in resource.data) || resource.data.userId == request.auth.uid);
+    }
+  }
+}

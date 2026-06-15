@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Represents the profile of a registered user",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The user's full name" },
+        "email": { "type": "string", "description": "The user's email address" },
+        "phone": { "type": "string", "description": "Verify phone number" },
+        "address": { "type": "string", "description": "Primary pick-up or operations address" },
+        "profilePhoto": { "type": "string", "description": "URL of the profile picture" },
+        "role": { "type": "string", "enum": ["donor", "ngo", "admin"], "description": "The platform access role" },
+        "orgName": { "type": "string", "description": "Organization name if applicable" },
+        "regId": { "type": "string", "description": "Registry registration ID for FSSAI verification" }
+      },
+      "required": ["name", "email", "phone", "address", "role"]
+    },
+    "DonationItem": {
+      "title": "DonationItem",
+      "description": "Stores a record of surplus food donation listing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unified donation ID code" },
+        "donorId": { "type": "string", "description": "UID of the donor who listed" },
+        "donorName": { "type": "string", "description": "Public name or brand of the donor" },
+        "foodName": { "type": "string", "description": "Nourishment listing description" },
+        "quantity": { "type": "string", "description": "Amount or weight being donated" },
+        "category": { "type": "string", "enum": ["Meal", "Grocery", "Raw Veggies", "Bakery", "Beverages", "Packed Food", "Other"], "description": "Categorized food class" },
+        "vegNonVeg": { "type": "string", "enum": ["Veg", "Non-Veg"], "description": "Dietary classification flag" },
+        "expiryTime": { "type": "string", "description": "Expiration timestamp standard ISO" },
+        "pickupTime": { "type": "string", "description": "Viable delivery pickup window" },
+        "pickupAddress": { "type": "string", "description": "Geographical physical collection address" },
+        "contactNumber": { "type": "string", "description": "Primary coordinator contact number" },
+        "imageUrl": { "type": "string", "description": "Food display preview photo URL" },
+        "status": { "type": "string", "enum": ["Available", "Requested", "Accepted", "Picked Up", "Delivered"], "description": "Listing status progress tracker" },
+        "createdAt": { "type": "string", "description": "Record generation timestamp" },
+        "lat": { "type": "number", "description": "Latitude coordinate marker" },
+        "lng": { "type": "number", "description": "Longitude coordinate marker" },
+        "distance": { "type": "string", "description": "Display calculated proximity" },
+        "notes": { "type": "string", "description": "Critical handling notifications" },
+        "assignedNgoId": { "type": "string", "description": "Receiving partner NGO UID code" },
+        "assignedNgoName": { "type": "string", "description": "Receiving partner NGO group name" }
+      },
+      "required": ["id", "donorId", "donorName", "foodName", "quantity", "category", "vegNonVeg", "expiryTime", "pickupTime", "pickupAddress", "contactNumber", "imageUrl", "status", "createdAt", "lat", "lng"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Event broadcast notifications or specific updates for users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unified message ID" },
+        "type": { "type": "string", "enum": ["New Donation", "Pickup Request", "Accepted Donation", "Delivered Donation"], "description": "Visual event trigger taxonomy" },
+        "title": { "type": "string", "description": "Notification title text segment" },
+        "message": { "type": "string", "description": "Notification message detailed body string" },
+        "time": { "type": "string", "description": "Faux human elapsed timeframe indicator" },
+        "read": { "type": "boolean", "description": "Read visual status indicator" },
+        "donationId": { "type": "string", "description": "Associated item ID trigger reference" },
+        "userId": { "type": "string", "description": "Recipient target user identifier" }
+      },
+      "required": ["id", "type", "title", "message", "time", "read"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Primary user profiles indexing accounts securely"
+    },
+    "/donations/{donationId}": {
+      "schema": "DonationItem",
+      "description": "Surplus food active registers"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Targeted notifications dispatch routing"
+    }
+  }
+}

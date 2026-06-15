@@ -1,0 +1,6 @@
+{
+  "name": "FoodBridge",
+  "description": "Reduce Food Waste, Feed More Lives. A premium, high-contrast community food donation platform connecting local donors with NGOs to rescue surplus food.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
